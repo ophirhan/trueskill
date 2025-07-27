@@ -9,7 +9,7 @@ from pytest import deprecated_call, raises
 from conftest import various_backends
 import trueskill as t
 from trueskill import (
-    quality, quality_1vs1, rate, rate_1vs1, Rating, setup, TrueSkill)
+    quality, quality_1vs1, rate, rate_1vs1, Rating, setup, TrueSkill, undo)
 
 
 warnings.simplefilter('always')
@@ -77,6 +77,15 @@ def test_rating_to_number():
     except NameError:
         # Python 3 doesn't have `long` anymore
         pass
+
+
+def test_undo():
+    r1, r2 = Rating(), Rating()
+    rate([(r1,), (r2,)])
+    assert undo() == [(r1,), (r2,)]
+    prev = (r1, r2)
+    r1, r2 = rate_1vs1(r1, r2)
+    assert undo() == [(prev[0],), (prev[1],)]
 
 
 def test_unsorted_groups():

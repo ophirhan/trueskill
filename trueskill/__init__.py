@@ -13,6 +13,8 @@ from __future__ import absolute_import
 
 from itertools import chain
 import math
+from copy import deepcopy
+import warnings
 
 from six import iteritems
 from six.moves import map, range, zip
@@ -28,7 +30,7 @@ __all__ = [
     # TrueSkill objects
     'TrueSkill', 'Rating',
     # functions for the global environment
-    'rate', 'quality', 'rate_1vs1', 'quality_1vs1', 'expose', 'setup',
+    'rate', 'quality', 'rate_1vs1', 'quality_1vs1', 'expose', 'setup', 'undo',
     'global_env',
     # default values
     'MU', 'SIGMA', 'BETA', 'TAU', 'DRAW_PROBABILITY',
@@ -186,6 +188,7 @@ class TrueSkill(object):
             self.cdf, self.pdf, self.ppf = backend
         else:
             self.cdf, self.pdf, self.ppf = choose_backend(backend)
+        self._history = []
 
     def create_rating(self, mu=None, sigma=None):
         """Initializes new :class:`Rating` object, but it fixes default mu and
@@ -475,6 +478,11 @@ class TrueSkill(object):
         .. versionadded:: 0.2
 
         """
+        if rating_groups and isinstance(rating_groups[0], Rating):
+            warnings.warn('Use TrueSkill.transform_ratings() instead',
+                          DeprecationWarning)
+            raise TypeError('Rating cannot be a rating group')
+        self._history.append(deepcopy(rating_groups))
         rating_groups, keys = self.validate_rating_groups(rating_groups)
         weights = self.validate_weights(weights, rating_groups, keys)
         group_size = len(rating_groups)
@@ -528,6 +536,10 @@ class TrueSkill(object):
         .. versionadded:: 0.2
 
         """
+        if rating_groups and isinstance(rating_groups[0], Rating):
+            warnings.warn('Use TrueSkill.match_quality() instead',
+                          DeprecationWarning)
+            raise TypeError('Rating cannot be a rating group')
         rating_groups, keys = self.validate_rating_groups(rating_groups)
         weights = self.validate_weights(weights, rating_groups, keys)
         flatten_ratings = sum(map(tuple, rating_groups), ())
@@ -579,6 +591,12 @@ class TrueSkill(object):
         """
         k = self.mu / self.sigma
         return rating.mu - k * rating.sigma
+
+    def undo(self):
+        """Undo the last :meth:`rate` call and return previous ratings."""
+        if not self._history:
+            raise ValueError('No previous rating to undo')
+        return self._history.pop()
 
     def make_as_global(self):
         """Registers the environment as the global environment.
@@ -718,6 +736,11 @@ def expose(rating):
 
     """
     return global_env().expose(rating)
+
+
+def undo():
+    """A proxy function to undo the last rating operation in the global environment."""
+    return global_env().undo()
 
 
 # Append deprecated methods into :class:`TrueSkill` and :class:`Rating`
